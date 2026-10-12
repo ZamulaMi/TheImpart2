@@ -11,7 +11,7 @@ import authHandler, { extractToken, verifyAdminToken } from './api/auth';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const app = express();
 const PORT = 3000;
