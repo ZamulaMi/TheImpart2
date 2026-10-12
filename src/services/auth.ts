@@ -146,18 +146,15 @@ export async function loginAdmin(
   const lowerUser = cleanUser.toLowerCase();
   const localCustom = getLocalCustomCreds();
 
-  // Редакційні реквізити за замовчуванням
-  const validDefaultUsers = ['admin_theimpart', 'admin'];
-  const validDefaultPasswords = ['K9#vP2$xL8!mR4&qT7', 'admin', 'admin123'];
-
+  // Лише офіційні реквізити: admin_theimpart та K9#vP2$xL8!mR4&qT7
   const isDefaultCredentials =
-    validDefaultUsers.includes(lowerUser) &&
-    validDefaultPasswords.includes(password.trim());
+    lowerUser === 'admin_theimpart' &&
+    password.trim() === 'K9#vP2$xL8!mR4&qT7';
 
   // Кастомні реквізити збережені у клієнта
   const isLocalCustomMatch =
     localCustom &&
-    (lowerUser === localCustom.username.toLowerCase() || lowerUser === 'admin') &&
+    lowerUser === localCustom.username.toLowerCase() &&
     quickHash(password) === localCustom.passHash;
 
   try {

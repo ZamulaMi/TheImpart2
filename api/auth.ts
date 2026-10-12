@@ -465,26 +465,21 @@ export default async function authHandler(req: any, res: any) {
       const inputPass = String(body?.password || '').trim();
       const lowerUser = inputUser.toLowerCase();
 
-      // Дозволені стандартні логіни
-      const isDefaultUser = lowerUser === 'admin_theimpart' || lowerUser === 'admin';
+      // Лише офіційний логін: admin_theimpart
+      const isDefaultUser = lowerUser === 'admin_theimpart';
 
-      // Дозволені стандартні паролі (конфігурований у .env, редакційний та простий адмінський)
+      // Лише офіційний пароль: K9#vP2$xL8!mR4&qT7 (або конфігурований у .env)
       const defaultCreds = getAdminCredentials();
-      const allowedStandardPasswords = [
-        defaultCreds.password,
-        'K9#vP2$xL8!mR4&qT7',
-        'admin',
-        'admin123',
-      ].filter(Boolean);
+      const configuredPassword = defaultCreds.password || 'K9#vP2$xL8!mR4&qT7';
 
-      const isDefaultPassValid = allowedStandardPasswords.some(
-        (p) => p && safeCompare(inputPass, p)
-      );
+      const isDefaultPassValid =
+        safeCompare(inputPass, configuredPassword) ||
+        safeCompare(inputPass, 'K9#vP2$xL8!mR4&qT7');
 
-      // Якщо введено правильні стандартні облікові дані — успішний вхід без блокувань
+      // Успішний вхід за офіційними реквізитами
       if (isDefaultUser && isDefaultPassValid) {
         resetAttempts(ip);
-        const activeUser = inputUser || defaultCreds.username || 'admin_theimpart';
+        const activeUser = 'admin_theimpart';
         const token = generateAdminToken(activeUser);
         return res.status(200).json({
           success: true,
@@ -497,7 +492,7 @@ export default async function authHandler(req: any, res: any) {
         });
       }
 
-      // Перевірка 2: кастомні дані (з тайм-аутом)
+      // Перевірка 2: кастомні дані (якщо були змінені через панель)
       let effective: any = null;
       try {
         effective = await Promise.race([
@@ -510,7 +505,7 @@ export default async function authHandler(req: any, res: any) {
 
       if (effective) {
         const isEffectiveUser =
-          lowerUser === String(effective.username || '').toLowerCase() || lowerUser === 'admin';
+          lowerUser === String(effective.username || '').toLowerCase();
         const isEffectivePass = effective.verifyPassword(inputPass);
         if (isEffectiveUser && isEffectivePass) {
           resetAttempts(ip);

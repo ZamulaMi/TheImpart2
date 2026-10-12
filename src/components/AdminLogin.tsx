@@ -121,7 +121,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={isLoading}
-                  placeholder="admin або admin_theimpart"
+                  placeholder="Login"
                   required
                   autoComplete="username"
                   className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 rounded-lg text-sm text-white placeholder-neutral-600 transition-all outline-none disabled:opacity-50"
@@ -184,15 +184,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
                 <span>Увійти до панелі керування</span>
               )}
             </button>
-
-            <div className="pt-3 border-t border-neutral-900/80 text-center">
-              <p className="text-[11px] text-neutral-400">
-                Логін: <code className="text-white px-1 py-0.5 bg-neutral-900 rounded font-mono">admin</code> або <code className="text-white px-1 py-0.5 bg-neutral-900 rounded font-mono">admin_theimpart</code>
-              </p>
-              <p className="text-[11px] text-neutral-400 mt-1">
-                Пароль: <code className="text-white px-1 py-0.5 bg-neutral-900 rounded font-mono">admin</code> або <code className="text-white px-1 py-0.5 bg-neutral-900 rounded font-mono">K9#vP2$xL8!mR4&qT7</code>
-              </p>
-            </div>
           </form>
         </div>
       </main>
