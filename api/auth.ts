@@ -362,11 +362,12 @@ export default async function authHandler(req: any, res: any) {
         return res.status(400).json({ error: 'Введіть поточний пароль для підтвердження прав.' });
       }
 
-      // Перевірка поточного пароля
+      // Перевірка поточного пароля (якщо встановлені кастомні дані, перевіряється тільки діючий кастомний пароль)
       const effective = await getEffectiveCredentials();
       const defaultCreds = getAdminCredentials();
-      const isPassValid =
-        effective.verifyPassword(currentPass) || safeCompare(currentPass, defaultCreds.password);
+      const isPassValid = effective.isCustom
+        ? effective.verifyPassword(currentPass)
+        : (effective.verifyPassword(currentPass) || safeCompare(currentPass, defaultCreds.password));
 
       if (!isPassValid) {
         return res.status(400).json({ error: 'Поточний пароль введено невірно.' });
@@ -419,8 +420,9 @@ export default async function authHandler(req: any, res: any) {
 
       const effective = await getEffectiveCredentials();
       const defaultCreds = getAdminCredentials();
-      const isPassValid =
-        effective.verifyPassword(currentPass) || safeCompare(currentPass, defaultCreds.password);
+      const isPassValid = effective.isCustom
+        ? effective.verifyPassword(currentPass)
+        : (effective.verifyPassword(currentPass) || safeCompare(currentPass, defaultCreds.password));
 
       if (!isPassValid) {
         return res.status(400).json({ error: 'Поточний пароль введено невірно.' });
@@ -465,34 +467,7 @@ export default async function authHandler(req: any, res: any) {
       const inputPass = String(body?.password || '').trim();
       const lowerUser = inputUser.toLowerCase();
 
-      // Лише офіційний логін: admin_theimpart
-      const isDefaultUser = lowerUser === 'admin_theimpart';
-
-      // Лише офіційний пароль: K9#vP2$xL8!mR4&qT7 (або конфігурований у .env)
-      const defaultCreds = getAdminCredentials();
-      const configuredPassword = defaultCreds.password || 'K9#vP2$xL8!mR4&qT7';
-
-      const isDefaultPassValid =
-        safeCompare(inputPass, configuredPassword) ||
-        safeCompare(inputPass, 'K9#vP2$xL8!mR4&qT7');
-
-      // Успішний вхід за офіційними реквізитами
-      if (isDefaultUser && isDefaultPassValid) {
-        resetAttempts(ip);
-        const activeUser = 'admin_theimpart';
-        const token = generateAdminToken(activeUser);
-        return res.status(200).json({
-          success: true,
-          token,
-          user: {
-            username: activeUser,
-            role: 'admin',
-            isCustom: false,
-          },
-        });
-      }
-
-      // Перевірка 2: кастомні дані (якщо були змінені через панель)
+      // Отримуємо діючі облікові дані з БД / файлу
       let effective: any = null;
       try {
         effective = await Promise.race([
@@ -503,10 +478,13 @@ export default async function authHandler(req: any, res: any) {
         effective = null;
       }
 
-      if (effective) {
+      // ВАРІАНТ А: Користувач змінив логін або пароль (кастомні реквізити активні)
+      // Вхід дозволено ВИКЛЮЧНО за новими реквізитами! Попередні дані анульовано.
+      if (effective && effective.isCustom) {
         const isEffectiveUser =
           lowerUser === String(effective.username || '').toLowerCase();
         const isEffectivePass = effective.verifyPassword(inputPass);
+
         if (isEffectiveUser && isEffectivePass) {
           resetAttempts(ip);
           const activeUser = effective.username;
@@ -517,7 +495,32 @@ export default async function authHandler(req: any, res: any) {
             user: {
               username: activeUser,
               role: 'admin',
-              isCustom: effective.isCustom,
+              isCustom: true,
+            },
+          });
+        }
+      } else {
+        // ВАРІАНТ Б: Кастомні дані не встановлені (або скинуті до стандартних)
+        // діють стандартні реквізити: admin_theimpart та K9#vP2$xL8!mR4&qT7
+        const isDefaultUser = lowerUser === 'admin_theimpart';
+        const defaultCreds = getAdminCredentials();
+        const configuredPassword = defaultCreds.password || 'K9#vP2$xL8!mR4&qT7';
+
+        const isDefaultPassValid =
+          safeCompare(inputPass, configuredPassword) ||
+          safeCompare(inputPass, 'K9#vP2$xL8!mR4&qT7');
+
+        if (isDefaultUser && isDefaultPassValid) {
+          resetAttempts(ip);
+          const activeUser = 'admin_theimpart';
+          const token = generateAdminToken(activeUser);
+          return res.status(200).json({
+            success: true,
+            token,
+            user: {
+              username: activeUser,
+              role: 'admin',
+              isCustom: false,
             },
           });
         }

@@ -146,16 +146,17 @@ export async function loginAdmin(
   const lowerUser = cleanUser.toLowerCase();
   const localCustom = getLocalCustomCreds();
 
-  // Лише офіційні реквізити: admin_theimpart та K9#vP2$xL8!mR4&qT7
+  // Лише офіційні реквізити: admin_theimpart та K9#vP2$xL8!mR4&qT7 (діють ТІЛЬКИ якщо немає кастомних)
   const isDefaultCredentials =
+    !localCustom &&
     lowerUser === 'admin_theimpart' &&
     password.trim() === 'K9#vP2$xL8!mR4&qT7';
 
   // Кастомні реквізити збережені у клієнта
   const isLocalCustomMatch =
-    localCustom &&
-    lowerUser === localCustom.username.toLowerCase() &&
-    quickHash(password) === localCustom.passHash;
+    Boolean(localCustom &&
+    lowerUser === String(localCustom.username || '').toLowerCase() &&
+    quickHash(password) === localCustom.passHash);
 
   try {
     const payload = JSON.stringify({ action: 'login', username: cleanUser, password });
@@ -209,7 +210,7 @@ export async function loginAdmin(
       } catch {}
 
       // Якщо користувач ввів кастомні реквізити, що збігаються з локальними
-      if (isLocalCustomMatch) {
+      if (isLocalCustomMatch && localCustom) {
         const activeUser = localCustom.username;
         const token = generateClientAdminToken(activeUser);
         setAuthToken(token, remember);
@@ -227,7 +228,7 @@ export async function loginAdmin(
     }
 
     // 5. Автоматичний клієнтський фолбек (якщо сервер повертає 500 / "A server error has occurred")
-    if (isLocalCustomMatch) {
+    if (isLocalCustomMatch && localCustom) {
       const activeUser = localCustom.username;
       const token = generateClientAdminToken(activeUser);
       setAuthToken(token, remember);
@@ -248,7 +249,7 @@ export async function loginAdmin(
       error: 'Невірний логін або пароль адміністратора.',
     };
   } catch (err: any) {
-    if (isLocalCustomMatch) {
+    if (isLocalCustomMatch && localCustom) {
       const activeUser = localCustom.username;
       const token = generateClientAdminToken(activeUser);
       setAuthToken(token, remember);
@@ -388,7 +389,7 @@ export async function changeAdminCredentials(
   const isDefaultPassMatch = currentPassword === 'K9#vP2$xL8!mR4&qT7';
   const isLocalCustomPassMatch =
     localCustom && quickHash(currentPassword) === localCustom.passHash;
-  const isCurrentPasswordValidLocally = isDefaultPassMatch || isLocalCustomPassMatch;
+  const isCurrentPasswordValidLocally = localCustom ? Boolean(isLocalCustomPassMatch) : isDefaultPassMatch;
 
   try {
     const token = getAuthToken();
@@ -489,7 +490,7 @@ export async function resetAdminCredentials(
   const isDefaultPassMatch = currentPassword === 'K9#vP2$xL8!mR4&qT7';
   const isLocalCustomPassMatch =
     localCustom && quickHash(currentPassword) === localCustom.passHash;
-  const isCurrentPasswordValidLocally = isDefaultPassMatch || isLocalCustomPassMatch;
+  const isCurrentPasswordValidLocally = localCustom ? Boolean(isLocalCustomPassMatch) : isDefaultPassMatch;
 
   try {
     const token = getAuthToken();
