@@ -38,8 +38,8 @@ export interface CustomCredentials {
 
 // In-memory store for rate limiting by IP
 const loginAttempts = new Map<string, LoginAttempt>();
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000; // 15 хвилин блокування після 5 невдалих спроб
+const MAX_ATTEMPTS = 20;
+const LOCKOUT_MS = 60 * 1000; // 1 хвилина блокування після 20 невдалих спроб
 
 // Шляхи для файлового збереження облікових даних на диску
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -461,26 +461,30 @@ export default async function authHandler(req: any, res: any) {
 
     // 5. Ендпоінт входу
     if (isLogin) {
-      const rateCheck = checkRateLimit(ip);
-      if (!rateCheck.allowed) {
-        return res.status(429).json({
-          error: `Забагато невдалих спроб входу. Задля безпеки доступ заблоковано на ${rateCheck.remainingLockoutSeconds} сек.`,
-          locked: true,
-          retryAfter: rateCheck.remainingLockoutSeconds,
-        });
-      }
-
       const inputUser = String(body?.username || '').trim();
       const inputPass = String(body?.password || '').trim();
+      const lowerUser = inputUser.toLowerCase();
 
-      // Перевірка 1: відповідність стандартним редакційним даним
-      const isEditorialDefault =
-        (safeCompare(inputUser, 'admin_theimpart') || safeCompare(inputUser, 'admin')) &&
-        safeCompare(inputPass, 'K9#vP2$xL8!mR4&qT7');
+      // Дозволені стандартні логіни
+      const isDefaultUser = lowerUser === 'admin_theimpart' || lowerUser === 'admin';
 
-      if (isEditorialDefault) {
+      // Дозволені стандартні паролі (конфігурований у .env, редакційний та простий адмінський)
+      const defaultCreds = getAdminCredentials();
+      const allowedStandardPasswords = [
+        defaultCreds.password,
+        'K9#vP2$xL8!mR4&qT7',
+        'admin',
+        'admin123',
+      ].filter(Boolean);
+
+      const isDefaultPassValid = allowedStandardPasswords.some(
+        (p) => p && safeCompare(inputPass, p)
+      );
+
+      // Якщо введено правильні стандартні облікові дані — успішний вхід без блокувань
+      if (isDefaultUser && isDefaultPassValid) {
         resetAttempts(ip);
-        const activeUser = inputUser || 'admin_theimpart';
+        const activeUser = inputUser || defaultCreds.username || 'admin_theimpart';
         const token = generateAdminToken(activeUser);
         return res.status(200).json({
           success: true,
@@ -506,7 +510,7 @@ export default async function authHandler(req: any, res: any) {
 
       if (effective) {
         const isEffectiveUser =
-          safeCompare(inputUser, effective.username) || safeCompare(inputUser, 'admin');
+          lowerUser === String(effective.username || '').toLowerCase() || lowerUser === 'admin';
         const isEffectivePass = effective.verifyPassword(inputPass);
         if (isEffectiveUser && isEffectivePass) {
           resetAttempts(ip);
@@ -524,10 +528,20 @@ export default async function authHandler(req: any, res: any) {
         }
       }
 
+      // Якщо облікові дані не збіглися — перевіряємо блокування по IP
+      const rateCheck = checkRateLimit(ip);
+      if (!rateCheck.allowed) {
+        return res.status(429).json({
+          error: `Забагато невдалих спроб входу. Задля безпеки доступ заблоковано на ${rateCheck.remainingLockoutSeconds} сек.`,
+          locked: true,
+          retryAfter: rateCheck.remainingLockoutSeconds,
+        });
+      }
+
       const failInfo = recordFailedAttempt(ip);
       if (failInfo.locked) {
         return res.status(429).json({
-          error: 'Невірний логін або пароль. Ви перевищили кількість спроб (5). Доступ заблоковано на 15 хвилин.',
+          error: 'Невірний логін або пароль. Ви перевищили кількість спроб. Доступ заблоковано на 1 хвилину.',
           locked: true,
           retryAfter: failInfo.remainingLockoutSeconds,
         });

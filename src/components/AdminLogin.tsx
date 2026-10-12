@@ -120,8 +120,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  disabled={isLoading || isLocked}
-                  placeholder="login"
+                  disabled={isLoading}
+                  placeholder="admin або admin_theimpart"
                   required
                   autoComplete="username"
                   className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 rounded-lg text-sm text-white placeholder-neutral-600 transition-all outline-none disabled:opacity-50"
@@ -141,7 +141,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading || isLocked}
+                  disabled={isLoading}
                   placeholder="••••••••••••••••"
                   required
                   autoComplete="current-password"
@@ -172,7 +172,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
 
             <button
               type="submit"
-              disabled={isLoading || isLocked}
+              disabled={isLoading}
               className="w-full py-3 bg-white text-black hover:bg-neutral-200 active:bg-neutral-300 font-medium text-sm rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
               {isLoading ? (
@@ -184,6 +184,15 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
                 <span>Увійти до панелі керування</span>
               )}
             </button>
+
+            <div className="pt-3 border-t border-neutral-900/80 text-center">
+              <p className="text-[11px] text-neutral-400">
+                Логін: <code className="text-white px-1 py-0.5 bg-neutral-900 rounded font-mono">admin</code> або <code className="text-white px-1 py-0.5 bg-neutral-900 rounded font-mono">admin_theimpart</code>
+              </p>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Пароль: <code className="text-white px-1 py-0.5 bg-neutral-900 rounded font-mono">admin</code> або <code className="text-white px-1 py-0.5 bg-neutral-900 rounded font-mono">K9#vP2$xL8!mR4&qT7</code>
+              </p>
+            </div>
           </form>
         </div>
       </main>
