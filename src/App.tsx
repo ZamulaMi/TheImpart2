@@ -220,7 +220,7 @@ function ArticleCard({ article, siteLang, aspectRatio, isHero = false, onSelect 
 }
 
 function parseRouteFromUrl(): {
-  route: 'main' | 'admin';
+  route: 'main' | 'admin' | 'login';
   section: HeaderSection | null;
   articleId: string | null;
   searchQuery: string | null;
@@ -236,12 +236,17 @@ function parseRouteFromUrl(): {
   const hash = window.location.hash;
   const params = new URLSearchParams(search);
 
-  // 1. Адмінка: /admin або #admin
+  // 1. Сторінка входу: /login або #login
+  if (path === '/login' || path.startsWith('/login/') || hash === '#login') {
+    return { route: 'login', section: null, articleId: null, searchQuery: null, page: 1 };
+  }
+
+  // 2. Адмінка: /admin або #admin
   if (path === '/admin' || path.startsWith('/admin/') || hash === '#admin') {
     return { route: 'admin', section: null, articleId: null, searchQuery: null, page: 1 };
   }
 
-  // 2. Пряме посилання на статтю: /article/:id або зворотна сумісність: ?article=:id або #article-:id
+  // 3. Пряме посилання на статтю: /article/:id або зворотна сумісність: ?article=:id або #article-:id
   let articleId: string | null = null;
   const articleMatch = rawPath.match(/^\/article\/(.+)$/i);
   if (articleMatch) {
@@ -256,7 +261,7 @@ function parseRouteFromUrl(): {
     return { route: 'main', section: null, articleId, searchQuery: null, page: 1 };
   }
 
-  // 3. Розділи: /news, /articles, /reviews або зворотна сумісність ?section=...
+  // 4. Розділи: /news, /articles, /reviews або зворотна сумісність ?section=...
   let section: HeaderSection | null = null;
   if (path === '/news' || params.get('section') === 'news') {
     section = 'news';
@@ -266,7 +271,7 @@ function parseRouteFromUrl(): {
     section = 'reviews';
   }
 
-  // 4. Пошук: /search/:query, /search?q=... або ?search=... або ?q=...
+  // 5. Пошук: /search/:query, /search?q=... або ?search=... або ?q=...
   let searchQuery: string | null = null;
   const searchMatch = rawPath.match(/^\/search\/(.+)$/i);
   if (searchMatch) {
@@ -276,7 +281,7 @@ function parseRouteFromUrl(): {
     if (q && q.trim()) searchQuery = q.trim();
   }
 
-  // 5. Пагінація: ?page=...
+  // 6. Пагінація: ?page=...
   const pgParam = parseInt(params.get('page') || '1', 10);
   const page = isNaN(pgParam) || pgParam < 1 ? 1 : pgParam;
 
@@ -284,19 +289,34 @@ function parseRouteFromUrl(): {
 }
 
 export default function App() {
-  const [currentRoute, setCurrentRoute] = useState<'main' | 'admin'>(() => parseRouteFromUrl().route);
+  const [currentRoute, setCurrentRoute] = useState<'main' | 'admin' | 'login'>(() => parseRouteFromUrl().route);
 
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     return Boolean(getAuthToken());
   });
 
+  // Автоматичне перенаправлення між /admin та /login залежно від статусу сесії
   useEffect(() => {
-    if (currentRoute === 'admin') {
+    if (currentRoute === 'admin' || currentRoute === 'login') {
       verifyAdminSession().then((isValid) => {
         setIsAdminAuthenticated(isValid);
+        if (currentRoute === 'admin' && !isValid) {
+          window.history.replaceState(null, '', '/login');
+          setCurrentRoute('login');
+        } else if (currentRoute === 'login' && isValid) {
+          window.history.replaceState(null, '', '/admin');
+          setCurrentRoute('admin');
+        }
       });
     }
   }, [currentRoute]);
+
+  useEffect(() => {
+    if (currentRoute === 'admin' && !isAdminAuthenticated && !getAuthToken()) {
+      window.history.replaceState(null, '', '/login');
+      setCurrentRoute('login');
+    }
+  }, [currentRoute, isAdminAuthenticated]);
 
   const [siteLang, setSiteLang] = useState<SiteLanguage>(() => {
     if (typeof window !== 'undefined') {
@@ -565,8 +585,18 @@ export default function App() {
   useEffect(() => {
     const handleLocationChange = () => {
       const parsed = parseRouteFromUrl();
+      if (parsed.route === 'login') {
+        setCurrentRoute('login');
+        setSelectedArticleId(null);
+        return;
+      }
       if (parsed.route === 'admin') {
-        setCurrentRoute('admin');
+        if (!isAdminAuthenticated && !getAuthToken()) {
+          window.history.replaceState(null, '', '/login');
+          setCurrentRoute('login');
+        } else {
+          setCurrentRoute('admin');
+        }
         setSelectedArticleId(null);
         return;
       }
@@ -594,12 +624,26 @@ export default function App() {
       window.removeEventListener('popstate', handleLocationChange);
       window.removeEventListener('hashchange', handleLocationChange);
     };
-  }, []);
+  }, [isAdminAuthenticated]);
 
-  const navigateTo = (route: 'main' | 'admin', articleId?: string) => {
-    if (route === 'admin') {
-      window.history.pushState(null, '', '/admin');
-      setCurrentRoute('admin');
+  const navigateTo = (route: 'main' | 'admin' | 'login', articleId?: string) => {
+    if (route === 'login') {
+      if (isAdminAuthenticated) {
+        window.history.pushState(null, '', '/admin');
+        setCurrentRoute('admin');
+      } else {
+        window.history.pushState(null, '', '/login');
+        setCurrentRoute('login');
+      }
+      setSelectedArticleId(null);
+    } else if (route === 'admin') {
+      if (!isAdminAuthenticated && !getAuthToken()) {
+        window.history.pushState(null, '', '/login');
+        setCurrentRoute('login');
+      } else {
+        window.history.pushState(null, '', '/admin');
+        setCurrentRoute('admin');
+      }
       setSelectedArticleId(null);
     } else {
       setCurrentRoute('main');
@@ -774,6 +818,8 @@ export default function App() {
   const handleAdminLogout = async () => {
     await logoutAdmin();
     setIsAdminAuthenticated(false);
+    window.history.pushState(null, '', '/login');
+    setCurrentRoute('login');
   };
 
   // Фільтрація статей відповідно до обраної мови
@@ -823,13 +869,29 @@ export default function App() {
 
   const selectedArticle = articles.find((a) => a.id === selectedArticleId);
 
-  // Режим адмін-панелі
+  // Окрема сторінка входу: /login
+  if (currentRoute === 'login') {
+    return (
+      <AdminLogin
+        onLoginSuccess={() => {
+          setIsAdminAuthenticated(true);
+          window.history.pushState(null, '', '/admin');
+          setCurrentRoute('admin');
+        }}
+        onBackToSite={() => navigateTo('main')}
+      />
+    );
+  }
+
+  // Режим адмін-панелі: /admin
   if (currentRoute === 'admin') {
     if (!isAdminAuthenticated) {
       return (
         <AdminLogin
           onLoginSuccess={() => {
             setIsAdminAuthenticated(true);
+            window.history.pushState(null, '', '/admin');
+            setCurrentRoute('admin');
           }}
           onBackToSite={() => navigateTo('main')}
         />
